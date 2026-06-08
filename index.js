@@ -21,7 +21,16 @@ const PORT = process.env.PORT || 3001;
 connectDB();
 
 // Middlewares
-app.use(cors());
+app.use(cors(
+  {
+    origin:[
+      'http://localhost:3000',
+      'https://final-six-xi-35.vercel.app/'
+    ],
+    credentials: true
+  }
+));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
