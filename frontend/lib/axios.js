@@ -1,12 +1,12 @@
 import axios from 'axios';
 
 const axiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
+  baseURL: 'https://final-h0m8.onrender.com',
   headers: {
     'Content-Type': 'application/json',
   },
   withCredentials: true,
-});
+})
 
 // Request Interceptor: Attach token if it exists in localStorage
 axiosInstance.interceptors.request.use(
