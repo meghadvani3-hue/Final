@@ -33,6 +33,10 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
+app.get('/', (req, res) => {
+  res.send('Backend is running 🚀');
+});
+
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/providers', require('./routes/providers'));
