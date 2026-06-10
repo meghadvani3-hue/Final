@@ -1,5 +1,8 @@
 const { initializeApp, getApps, cert } = require('firebase-admin/app');
 const { getMessaging } = require('firebase-admin/messaging');
+const { getFirestore } = require('firebase-admin/firestore');
+
+let db = null;
 
 try {
   if (getApps().length === 0) {
@@ -16,8 +19,12 @@ try {
       console.log('Firebase Admin initialized ✅');
     }
   }
+  
+  if (getApps().length > 0) {
+    db = getFirestore();
+  }
 } catch (err) {
   console.error('Firebase init error:', err.message);
 }
 
-module.exports = { getMessaging };
+module.exports = { getMessaging, db };

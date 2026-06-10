@@ -2,19 +2,9 @@ require('dotenv').config();
 console.log('Firebase Key exists:', !!process.env.FIREBASE_PRIVATE_KEY);
 const express = require('express');
 const cors = require('cors');
-const http = require('http');
-const socketio = require('socket.io');
 const connectDB = require('./config/db');
-const { initSocket } = require('./socket/chat');
 
 const app = express();
-const server = http.createServer(app);
-const io = socketio(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
-});
 
 const PORT = process.env.PORT || 3001;
 
@@ -35,8 +25,6 @@ app.use(cors(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Initialize Socket.io Events
-initSocket(io);
 
 // Health Check Route
 app.get('/api/health', (req, res) => {
@@ -56,6 +44,6 @@ app.use('/api/payment', require('./routes/payment'));
 app.use('/api', require('./routes/fcm'));
 
 // Start Server
-server.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

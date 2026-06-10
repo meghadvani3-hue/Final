@@ -1,190 +1,127 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { io } from 'socket.io-client';
+import { db } from '@/lib/firebase';
+import { collection, doc, query, orderBy, onSnapshot, setDoc } from 'firebase/firestore';
+import { useAuthStore } from '@/store/authStore';
+import axiosInstance from '@/lib/axios';
 import toast from 'react-hot-toast';
 
-const getSocketURL = () => {
-  if (typeof window !== 'undefined') {
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      return 'http://localhost:3001';
-    }
-  }
-  return process.env.NEXT_PUBLIC_API_URL || 'https://final-h0m8.onrender.com';
-};
-
-const SOCKET_URL = getSocketURL();
-
 export function useSocket(bookingId, token, onMessageReceived, onTypingReceived) {
-  const socketRef = useRef(null);
   const mockTimeoutRef = useRef(null);
+  
+  // Reactively retrieve user from auth store to bypass manual base64 JWT decoding
+  const user = useAuthStore((state) => state.user);
+  const userId = user?.id || user?._id;
 
   useEffect(() => {
-    if (!token || !bookingId) return;
+    if (!token || !bookingId || !userId) return;
 
-    let socket = null;
+    let unsubscribeMessages = null;
+    let unsubscribeTyping = null;
 
     try {
-      // Connect to the Socket.io server
-      socket = io(SOCKET_URL, {
-        transports: ['polling', 'websocket'],
-        reconnectionAttempts: 5,
-        timeout: 5000,
-        auth: { token }
-      });
+      // 1. Subscribe to Firestore messages for this booking in real-time
+      const messagesRef = collection(db, 'bookings', bookingId, 'messages');
+      const messagesQuery = query(messagesRef, orderBy('createdAt', 'asc'));
 
-      socketRef.current = socket;
-
-      socket.on('connect', () => {
-        console.log('Socket.io connected successfully:', socket.id);
-        socket.emit('join-room', bookingId);
-      });
-
-      socket.on('receive-message', (msg) => {
-        if (onMessageReceived) {
-          onMessageReceived(msg);
-        }
-      });
-
-      socket.on('message-error', (data) => {
-        console.error('Socket message error:', data.message);
-        toast.error(`Message Error: ${data.message}`);
-      });
-
-      socket.on('typing', (data) => {
-        if (data && data.bookingId === bookingId && onTypingReceived) {
-          onTypingReceived(data.isTyping);
-        }
-      });
-
-      socket.on('connect_error', (err) => {
-        console.warn('Socket.io connection failed, switching to local mock loop:', err.message);
+      unsubscribeMessages = onSnapshot(messagesQuery, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const data = change.doc.data();
+            if (onMessageReceived) {
+              onMessageReceived({
+                _id: data._id,
+                bookingId: data.bookingId,
+                sender: data.sender,
+                text: data.text,
+                isRead: data.isRead || false,
+                createdAt: data.createdAt,
+                updatedAt: data.updatedAt
+              });
+            }
+          }
+        });
+      }, (err) => {
+        console.error('Firestore messages subscription failed:', err.message);
+        toast.error(`Real-time chat error: ${err.message}`);
         setupMockFallback();
       });
 
+      // 2. Subscribe to typing indicators
+      const typingRef = collection(db, 'bookings', bookingId, 'typing');
+      unsubscribeTyping = onSnapshot(typingRef, (snapshot) => {
+        let isSomeoneTyping = false;
+        snapshot.forEach((doc) => {
+          // Ignore current user's typing state
+          if (doc.id !== userId) {
+            const data = doc.data();
+            if (data.isTyping) {
+              // Ensure status is recent (within 15 seconds) to avoid stuck states
+              const updatedAt = new Date(data.updatedAt).getTime();
+              if (Date.now() - updatedAt < 15000) {
+                isSomeoneTyping = true;
+              }
+            }
+          }
+        });
+        if (onTypingReceived) {
+          onTypingReceived(isSomeoneTyping);
+        }
+      });
+
     } catch (err) {
-      console.warn('Socket.io initialization error, switching to local mock loop:', err.message);
+      console.error('Firebase setup error:', err.message);
+      toast.error(`Firebase Connection Error: ${err.message}`);
       setupMockFallback();
     }
 
     function setupMockFallback() {
-      if (socket) {
-        socket.disconnect();
-      }
-
       console.log('Initializing local mock WebSocket emulation loop.');
-
-      socketRef.current = {
-        connected: true,
-        emit: (event, payload) => {
-          if (event === 'send-message') {
-            const { bookingId: bId, senderId, text } = payload;
-            
-            const getMockData = (key) => JSON.parse(localStorage.getItem(key) || '[]');
-            const saveMockData = (key, data) => localStorage.setItem(key, JSON.stringify(data));
-
-            const mockMessages = getMockData('companion_mock_messages');
-            const newMsg = {
-              _id: 'mock_msg_' + Date.now(),
-              bookingId: bId,
-              sender: senderId,
-              text,
-              isRead: false,
-              createdAt: new Date().toISOString()
-            };
-            mockMessages.push(newMsg);
-            saveMockData('companion_mock_messages', mockMessages);
-
-            // Trigger immediate local message display
-            if (onMessageReceived) {
-              onMessageReceived(newMsg);
-            }
-
-            // Emulate companion typing indicator and message reply
-            if (mockTimeoutRef.current) clearTimeout(mockTimeoutRef.current);
-            
-            mockTimeoutRef.current = setTimeout(() => {
-              if (onTypingReceived) onTypingReceived(true);
-              
-              mockTimeoutRef.current = setTimeout(() => {
-                if (onTypingReceived) onTypingReceived(false);
-                
-                const replies = [
-                  "I completely understand. Tell me more about that.",
-                  "Thank you for sharing that with me. I am here for you.",
-                  "That sounds like a lot to carry. How has that been affecting your week?",
-                  "I'm really glad we're talking about this right now.",
-                  "I am here. Take your time, there is no rush.",
-                  "That makes total sense. You're doing the best you can.",
-                  "I've got your back. Let's get through this together!"
-                ];
-                const randomReply = replies[Math.floor(Math.random() * replies.length)];
-                
-                const mockBookings = getMockData('companion_mock_bookings');
-                const booking = mockBookings.find(b => b._id === bookingId);
-                let replySenderId = 'system';
-                
-                if (booking) {
-                  const isSenderSeeker = senderId === (booking.seeker._id || booking.seeker);
-                  replySenderId = isSenderSeeker 
-                    ? (booking.provider._id || booking.provider)
-                    : (booking.seeker._id || booking.seeker);
-                }
-
-                const replyMsg = {
-                  _id: 'mock_msg_reply_' + Date.now(),
-                  bookingId: bId,
-                  sender: replySenderId,
-                  text: randomReply,
-                  isRead: false,
-                  createdAt: new Date().toISOString()
-                };
-
-                const updatedMsgs = getMockData('companion_mock_messages');
-                updatedMsgs.push(replyMsg);
-                saveMockData('companion_mock_messages', updatedMsgs);
-                
-                if (onMessageReceived) {
-                  onMessageReceived(replyMsg);
-                }
-              }, 2000);
-            }, 1500);
-          }
-        },
-        disconnect: () => {
-          console.log('Emulated mock socket disconnected.');
-          if (mockTimeoutRef.current) clearTimeout(mockTimeoutRef.current);
-        }
-      };
+      
+      // Clean up previous listeners if they were somehow partially active
+      if (unsubscribeMessages) unsubscribeMessages();
+      if (unsubscribeTyping) unsubscribeTyping();
     }
 
-    // Disconnect websocket connection on unmount
+    // Clean up connections/listeners on unmount
     return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-      }
-      if (mockTimeoutRef.current) {
-        clearTimeout(mockTimeoutRef.current);
-      }
+      if (unsubscribeMessages) unsubscribeMessages();
+      if (unsubscribeTyping) unsubscribeTyping();
+      if (mockTimeoutRef.current) clearTimeout(mockTimeoutRef.current);
     };
-  }, [bookingId, token, onMessageReceived, onTypingReceived]);
+  }, [bookingId, token, userId, onMessageReceived, onTypingReceived]);
 
-  const sendMessage = (text, senderId) => {
-    if (socketRef.current) {
-      socketRef.current.emit('send-message', {
+  // Send message using REST API, which saves to MongoDB and updates Firestore
+  const sendMessage = async (text, senderId) => {
+    if (!bookingId || !text) return;
+    try {
+      const response = await axiosInstance.post('/api/messages', {
         bookingId,
-        senderId,
         text
       });
+
+      // Optimistic Update: Add message to client UI immediately upon successful HTTP response
+      if (response.data && onMessageReceived) {
+        onMessageReceived(response.data);
+      }
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      toast.error('Failed to send message');
     }
   };
 
-  const emitTyping = (isTyping) => {
-    if (socketRef.current && typeof socketRef.current.emit === 'function') {
-      socketRef.current.emit('typing', {
-        bookingId,
-        isTyping
-      });
+  // Emit typing status by writing to Firestore typing subcollection
+  const emitTyping = async (isTyping) => {
+    if (!userId || !bookingId) return;
+    try {
+      const typingDocRef = doc(db, 'bookings', bookingId, 'typing', userId);
+      await setDoc(typingDocRef, {
+        isTyping,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (err) {
+      console.warn('Failed to emit typing state to Firestore:', err.message);
     }
   };
 

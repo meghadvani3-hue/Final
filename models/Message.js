@@ -27,4 +27,7 @@ const MessageSchema = new mongoose.Schema(
   }
 );
 
+// Add index to optimize document retrieval and avoid COLLSCAN
+MessageSchema.index({ bookingId: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Message', MessageSchema);
