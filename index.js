@@ -1,4 +1,5 @@
 require('dotenv').config();
+console.log('Firebase Key exists:', !!process.env.FIREBASE_PRIVATE_KEY);
 const express = require('express');
 const cors = require('cors');
 const http = require('http');

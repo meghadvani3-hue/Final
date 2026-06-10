@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { getMessaging } = require('../config/firebase');
 const { check, validationResult } = require('express-validator');
 const Booking = require('../models/Booking');
 const User = require('../models/User');
@@ -67,7 +68,7 @@ router.post(
       try {
         const providerUser = await User.findById(provider);
         if (providerUser && providerUser.fcmToken) {
-          await admin.messaging().send({
+          await getMessaging().send({
             token: providerUser.fcmToken,
             notification: {
               title: '🔔 New Booking Request!',
