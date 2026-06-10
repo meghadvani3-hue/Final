@@ -107,8 +107,9 @@ const providersData = [
 
 const seedDB = async () => {
   try {
-    console.log('Connecting to MongoDB...');
-    await mongoose.connect(process.env.MONGO_URI);
+    const dbURI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/companion';
+    console.log(`Connecting to MongoDB at ${dbURI}...`);
+    await mongoose.connect(dbURI);
     console.log('Connected to MongoDB. Clearing old database records...');
 
     // Clear old records

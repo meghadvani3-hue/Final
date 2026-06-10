@@ -2,8 +2,18 @@
 
 import { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
+import toast from 'react-hot-toast';
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const getSocketURL = () => {
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'http://localhost:3001';
+    }
+  }
+  return process.env.NEXT_PUBLIC_API_URL || 'https://final-h0m8.onrender.com';
+};
+
+const SOCKET_URL = getSocketURL();
 
 export function useSocket(bookingId, token, onMessageReceived, onTypingReceived) {
   const socketRef = useRef(null);
@@ -17,9 +27,8 @@ export function useSocket(bookingId, token, onMessageReceived, onTypingReceived)
     try {
       // Connect to the Socket.io server
       socket = io(SOCKET_URL, {
-        transports: ['websocket'],
-        upgrade: false,
-        reconnectionAttempts: 2,
+        transports: ['polling', 'websocket'],
+        reconnectionAttempts: 5,
         timeout: 5000,
         auth: { token }
       });
@@ -35,6 +44,11 @@ export function useSocket(bookingId, token, onMessageReceived, onTypingReceived)
         if (onMessageReceived) {
           onMessageReceived(msg);
         }
+      });
+
+      socket.on('message-error', (data) => {
+        console.error('Socket message error:', data.message);
+        toast.error(`Message Error: ${data.message}`);
       });
 
       socket.on('typing', (data) => {

@@ -1,7 +1,16 @@
 import axios from 'axios';
 
+const getBaseURL = () => {
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'http://localhost:3001';
+    }
+  }
+  return process.env.NEXT_PUBLIC_API_URL || 'https://final-h0m8.onrender.com';
+};
+
 const axiosInstance = axios.create({
-  baseURL: 'https://final-h0m8.onrender.com',
+  baseURL: getBaseURL(),
   headers: {
     'Content-Type': 'application/json',
   },
