@@ -9,15 +9,12 @@ const UserSchema = new mongoose.Schema({
   email: {
     type: String,
     required: true,
-    unique: true,
-    lowercase: true,
-    trim: true
+    unique: true, lowercase: true, trim: true
   },
   phone: {
     type: String,
     required: true,
-    unique: true,
-    trim: true
+    unique: true, trim: true
   },
   passwordHash: {
     type: String,
@@ -31,6 +28,10 @@ const UserSchema = new mongoose.Schema({
   isVerified: {
     type: Boolean,
     default: false
+  },
+  fcmToken: {
+    type: String,
+    default: null
   },
   createdAt: {
     type: Date,

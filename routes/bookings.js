@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { check, validationResult } = require('express-validator');
 const Booking = require('../models/Booking');
+const User = require('../models/User');
+const admin = require('../config/firebase');
 const ProviderProfile = require('../models/ProviderProfile');
 const auth = require('../middleware/auth');
 
@@ -62,6 +64,22 @@ router.post(
       });
 
       await booking.save();
+      try {
+        const providerUser = await User.findById(provider);
+        if (providerUser && providerUser.fcmToken) {
+          await admin.messaging().send({
+            token: providerUser.fcmToken,
+            notification: {
+              title: '🔔 New Booking Request!',
+              body: 'A seeker has booked your service. Open Nexora to respond.'
+            }
+          });
+          console.log('Notification sent to provider');
+        }
+      } catch (notifErr) {
+        console.error('Notification error:', notifErr.message);
+      }
+
       res.status(201).json({ message: 'Booking created successfully', booking });
     } catch (err) {
       console.error(err.message);

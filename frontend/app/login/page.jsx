@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
+import { useAuthStore } from '@/store/authStore';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,6 +14,7 @@ function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get('redirect');
+  const fcmToken = searchParams.get('fcmToken');
 
   const { user, loading: authLoading, login, register } = useAuth();
 
@@ -40,6 +42,7 @@ function LoginContent() {
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
+    const { user, token, login, register } = useAuth(); 
     try {
       if (authTab === 'login') {
         const loggedInUser = await login(email, password);
@@ -47,11 +50,22 @@ function LoginContent() {
         router.push(target);
       } else {
         const registeredUser = await register({ name, email, phone, password, role });
+        if (fcmToken) {
+        const authToken = useAuthStore.getState().token; 
+        await fetch('https://final-h0m8.onrender.com/api/save-fcm-token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ fcmToken })
+      });
+    }
         const target = redirectUrl || (registeredUser.role === 'provider' ? '/dashboard/profile' : '/browse');
         router.push(target);
       }
     } catch (err) {
-      // Toast notifications are handled within the AuthContext
+      console.error('Authentication error:', err);
     } finally {
       setSubmitting(false);
     }

@@ -52,6 +52,7 @@ app.use('/api/providers', require('./routes/providers'));
 app.use('/api/bookings', require('./routes/bookings'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/payment', require('./routes/payment'));
+app.use('/api', require('./routes/fcm'));
 
 // Start Server
 server.listen(PORT, () => {
