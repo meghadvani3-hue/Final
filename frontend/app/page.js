@@ -7,6 +7,7 @@ import { Shield, Lock, CreditCard, Clock, Play, ArrowRight, Star, Heart } from '
 import { api } from './api';
 import Navbar from '@/components/Navbar';
 import ParticleCanvas from '@/components/ParticleCanvas';
+import BackgroundVideo from '@/components/BackgroundVideo';
 import GlassCard from '@/components/GlassCard';
 
 export default function Home() {
@@ -54,8 +55,8 @@ export default function Home() {
 
   return (
     <div className="relative min-h-screen bg-companion-black text-white overflow-hidden flex flex-col">
-      {/* Absolute background star field */}
-      <ParticleCanvas density="high" color="mixed" showHorizon={true} />
+      {/* Absolute background video field */}
+      <BackgroundVideo showHorizon={true} />
 
       <Navbar />
 
